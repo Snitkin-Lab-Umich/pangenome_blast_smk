@@ -1,0 +1,27 @@
+# Singularity arguments
+# use-singularity: True
+# The paths below must be changed if you are using a different database OR a different BUSCO seed species during funannotate's annotation step
+# singularity-args: "--bind /nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline_testing/2024_11_11_funQCD_database/lib/interproscan_data/data/:/opt/interproscan/data/ --bind /nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline_testing/2024_11_11_funQCD_database/lib/busco/lineages/saccharomycetes_odb10/:/opt/databases/saccharomycetes_odb10/"
+
+# conda arguments
+use-conda: True
+
+# cluster arguments
+latency-wait: 1000
+nolock: True
+# make sure at least 8 cores are provided 
+cores: 8
+# make sure this is equal to the memory provided in config/config.yaml
+#resources: mem_mb=32000
+jobs: 20
+max-jobs-per-second: 1
+max-status-checks-per-second: 1
+
+# slurm settings
+slurm: True
+default-resources:
+  - slurm_account=esnitkin1
+  - slurm_partition=standard
+  - runtime=120
+  - mem_mb=15000
+#  - disk_mb=1000000

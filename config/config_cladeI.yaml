@@ -1,0 +1,61 @@
+# Configuration settings for Snakemake
+
+# run name
+prefix: "splice_neighbor_v5"
+
+# clade name (no spaces)
+clade: "clade_I"
+
+
+
+### clade-specific information
+
+# accessory gene list
+accessory_gene_list: "/nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline_testing/2025-09-25_pvo/092525_pangenome_results/accessory_blast_search/input/accessory_gene_list_cI_v1.csv"
+
+# filter file of isolate names
+# only isolates present in this list will be used for analysis
+# note that this will filter all steps, including blastdb generation
+filterfile: "/nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline_testing/2025-09-25_pvo/092525_pangenome_results/accessory_blast_search/input/cladeI_filterfile.csv"
+
+
+### pangenome information
+
+# directory of assemblies used in Panaroo
+assemblies_dir: "/nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline_testing/2025-09-25_pvo/092525_pangenome_results/nucleotide_fasta_spliceIntrons/"
+
+# directory of GFF files used in Panaroo
+gff_dir: "/nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline_testing/2025-09-25_pvo/092525_pangenome_results/prokka_gff_spliceIntrons/"
+
+# presence/absence matrix file from Panaroo output
+# this should contain gene names for each isolate
+pangenome_matrix: "/nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline_testing/2025-09-25_pvo/092525_pangenome_results/accessory_blast_search/input/gene_presence_absence_splice_processed_names_v1.csv"
+
+# pangenome graph file from Panaroo output
+pangenome_graph: "/nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline_testing/2025-09-25_pvo/092525_pangenome_results/accessory_blast_search/input/panaroo_out_v2_spliceIntrons_final_graph.gml"
+
+
+### blast settings
+
+# blast subject
+# this can either be an existing blast database (ending in .fasta or .fa), or a directory of fasta files
+# if a directory is provided, a blast database will be created for the next run
+#blast_subject: "/nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline_testing/2025-09-25_pvo/092525_pangenome_results/nucleotide_fasta_spliceIntrons/"
+blast_subject: "/nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline_testing/2025-09-25_pvo/092525_pangenome_results/accessory_blast_search/blast_db/cladeI_splice/cladeI_pangenome_isolates_SPLICED_v3/cladeI_pangenome_isolates_SPLICED_v3_blastdb.fasta"
+
+
+# caurisblast repo address
+caurisblast_repo: "https://github.com/Snitkin-Lab-Umich/caurisblast"
+
+# assorted blast settings
+eval_threshold: 1e-5
+wordsize: 11
+
+# blast summary strategy - either 'merge', 'best_hit', or 'neighbor_best_hit'
+# see the help page for read_blast_neighbors.py for details
+blast_summary_strategy: "neighbor_best_hit"
+
+# neighbor mode flag
+# specify if the final comparison between Panaroo and BLAST should include neighbor information
+# this cannot be enabled successfully if you did not use neighbor_best_hit as the blast_summary_strategy
+neighbor_mode: "True"

@@ -1,0 +1,154 @@
+import os
+import argparse
+import pandas as pd
+
+def read_blast_data_v2(blast_file):
+    blastdict = {'high_confidence': {}, 'medium_confidence': {}}
+    with open(blast_file, 'r') as fhin:
+        next(fhin)
+        for line in fhin:
+            query_seqid, subject_seqid, expected_neighbors, found_neighbors = line.strip().split('\t')
+            if query_seqid not in blastdict['high_confidence']:
+                blastdict['high_confidence'][query_seqid] = []
+            if query_seqid not in blastdict['medium_confidence']:
+                blastdict['medium_confidence'][query_seqid] = []
+            # high confidence: 2 neighbors expected and found
+            # medium confidence: 1 neighbor expected and found, or 2 expected but only 1 found
+            if int(expected_neighbors) == 2 and int(found_neighbors) == 2:
+                blastdict['high_confidence'][query_seqid].append(subject_seqid)
+                blastdict['medium_confidence'][query_seqid].append(subject_seqid)
+            elif (int(expected_neighbors) == 1 and int(found_neighbors) == 1) or (int(expected_neighbors) == 2 and int(found_neighbors) == 1):
+                blastdict['medium_confidence'][query_seqid].append(subject_seqid)
+    return blastdict
+
+def compare_panaroo_blast(panaroo_file, blast_file, filterfile, output_file, confidence_level = 'medium_confidence', neighbor_mode=False):
+    # read in the gene families that were used to generate the BLAST results
+    # genefam_data = pd.read_csv(input_gene_families)
+    # read in the panaroo presence/absence matrix
+    pandf = read_panaroo_data(panaroo_file, filterfile)
+    # read in the BLAST results
+    blastdict_all = read_blast_data_v2(blast_file)
+    blastdict = blastdict_all[confidence_level]
+    # for each key in blastdict, check if the values match the columns with entries other than ''
+    agreedata = {}
+    for gene_fam in blastdict:
+        if gene_fam not in pandf['Gene'].values:
+            print(f'{gene_fam} not found in panaroo data')
+            quit(1)
+        gene_fam_row_index = pandf[pandf['Gene'] == gene_fam].index[0]
+        pan_data_series = pandf.loc[gene_fam_row_index]
+        # remove the Gene column
+        pan_data_series = pan_data_series.drop('Gene')
+        # get the index names that have non-empty entries
+        panaroo_presence = list(pan_data_series[pan_data_series != ''].index)
+        panaroo_absence = list(pan_data_series[pan_data_series == ''].index)
+        blast_presence = blastdict[gene_fam]
+        # count the number of cases off all four possibilities: present in both, absent in both, present in panaroo only, present in blast only
+        present_in_both = len([x for x in panaroo_presence if x in blast_presence])
+        absent_in_both = len([x for x in panaroo_absence if x not in blast_presence])
+        present_in_panaroo_only = len([x for x in panaroo_presence if x not in blast_presence])
+        present_in_blast_only = len([x for x in panaroo_absence if x in blast_presence])
+        genefam_agreedata = [present_in_both, absent_in_both, present_in_panaroo_only, present_in_blast_only]
+        # print out unexpected cases
+        #print(f'Gene family {gene_fam}:')
+        # if present_in_panaroo_only > 0:
+        #     print(f'Present in Panaroo only:')
+        #     print([x for x in panaroo_presence if x not in blast_presence])
+        # if present_in_blast_only > 0:
+        #     print(f'Present in BLAST only:')
+        #     print([x for x in panaroo_absence if x in blast_presence])
+        if sum(genefam_agreedata) != len(panaroo_presence) + len(panaroo_absence):
+            print(f'Math error for gene family {gene_fam}')
+            quit(1)
+        agreedata[gene_fam] = genefam_agreedata
+    # write the output file
+    with open(output_file, 'w') as out_f:
+        _ = out_f.write('Gene_Family\tPresent_in_Both\tAbsent_in_Both\tPresent_in_Panaroo_Only\tPresent_in_BLAST_Only\n')
+        for gene_fam in agreedata:
+            data = agreedata[gene_fam]
+            out_f.write(f'{gene_fam}\t{data[0]}\t{data[1]}\t{data[2]}\t{data[3]}\n')
+
+
+def read_panaroo_data(panaroo_file, filterfile):
+    pan = pd.read_csv(panaroo_file,keep_default_na=False)
+    # subset pan to only contain columns for the gene family names and isolates
+    pan = pan.loc[:, pan.columns.str.startswith(("Gene", "SRR", "ARR", "DRR", "ERR", "UM_", "Chi_", "b8441"))]
+    # subset pan to only include isolates in the filter file, if provided
+    if filterfile is not None:
+        with open(filterfile, 'r') as fh:
+            filter_list = [line.strip() for line in fh]
+        # always keep the 'Gene' column
+        filter_list.append('Gene')
+        # include only the columns in the filter list
+        pan = pan.loc[:, pan.columns.isin(filter_list)]
+    return pan
+
+def read_blast_data(blast_file, neighbor_mode):
+    blastdict = {}
+    with open(blast_file, 'r') as fhin:
+        next(fhin)
+        for line in fhin:
+            if neighbor_mode:
+                query_seqid, subject_seqid, neighbor_status = line.strip().split('\t')
+            if not neighbor_mode:
+                query_seqid, subject_seqid = line.strip().split('\t')
+                neighbor_status = 'present'
+            if query_seqid not in blastdict:
+                blastdict[query_seqid] = []
+            # for now, simply ignore all cases where the neighbor status is not 'present'
+            if neighbor_status != 'present':
+                continue
+            if subject_seqid != 'None':
+                blastdict[query_seqid].append(subject_seqid)
+    return blastdict
+
+def check_boolean_arg(input_str):
+    if input_str.lower() in ['true', 't', '1']:
+        return True
+    elif input_str.lower() in ['false', 'f', '0']:
+        return False
+    else:
+        print('Error: Boolean required for --neighbor_mode')
+        quit(1)
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--blast','-b',type=str,
+        help='''Provide a BLAST summary file generated by the read_blast script.''',
+        required=True
+        )
+    parser.add_argument(
+        '--panaroo','-p',type=str,
+        help='''Provide Panaroo presence/absence matrix file in the csv format. This should be the same file the gene families in the 
+        input list are drawn from, and the same file used with extract_gene_from_isolate. Gene names should be present in this file.''',
+        required=True
+        )
+    parser.add_argument(
+        '--filterfile','-ff',type=str,
+        help='''Provide a path to a one-column csv consisting only of isolate names. Only isolates in this file will be used.''',
+        default=None
+        )
+    parser.add_argument(
+        '--output','-o',type=str,
+        help='''Provide a file name for the output file.''',
+        required=True
+        )
+    # add a flag for neighbor mode
+    parser.add_argument(
+        '--neighbor_mode',type=str,
+        help='''Add this flag if you included neighbor analysis on the read_blast step.''',
+        required=False,default='False'
+        )
+    parser.add_argument(
+        '--confidence','-c',choices=['high_confidence','medium_confidence'],type=str,
+        help='''Provide a minimum confidence level for the comparison.''',
+        required=True
+        )
+    args = parser.parse_args()
+    args.neighbor_mode = check_boolean_arg(args.neighbor_mode)
+    compare_panaroo_blast(args.panaroo, args.blast, args.filterfile, args.output, args.confidence, args.neighbor_mode)
+
+
+if __name__ == '__main__':
+    main()

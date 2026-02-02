@@ -1,0 +1,16 @@
+#!/bin/bash
+
+#SBATCH --mail-user=jjhale@umich.edu
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --export=ALL
+#SBATCH --partition=standard
+#SBATCH --account=esnitkin1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=5g
+#SBATCH --time=16:00:00
+
+# reminder: requires blast-plus/2.16.0 module
+
+module load Bioinformatics snakemake blast-plus/2.16.0
+snakemake -s workflow/pangenome_blast.smk -p --configfile config/config_cladeI.yaml --profile ./profile/

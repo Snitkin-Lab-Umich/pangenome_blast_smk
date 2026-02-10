@@ -1,7 +1,7 @@
 # Configuration settings for Snakemake
 
 # run name
-prefix: "splice_neighbor_v4"
+prefix: "splice_neighbor_v7"
 
 # clade name (no spaces)
 clade: "clade_IV"
@@ -40,7 +40,7 @@ pangenome_graph: "/nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline
 # blast subject
 # this can either be an existing blast database (ending in .fasta or .fa), or a directory of fasta files
 # if a directory is provided, a blast database will be created for the next run
-blast_subject: "/nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline_testing/2025-09-25_pvo/092525_pangenome_results/nucleotide_fasta_spliceIntrons/"
+blast_subject: "/nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline_testing/2025-09-25_pvo/092525_pangenome_results/accessory_blast_search/blast_db/cladeIV_splice/splice_neighbor_v4_clade_IV/splice_neighbor_v4_clade_IV_blastdb.fasta"
 #blast_subject: "/nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline_testing/2025-09-25_pvo/092525_pangenome_results/accessory_blast_search/blast_db/cladeI_splice/cladeI_pangenome_isolates_SPLICED_v3/cladeI_pangenome_isolates_SPLICED_v3_blastdb.fasta"
 
 
@@ -59,3 +59,12 @@ blast_summary_strategy: "neighbor_best_hit"
 # specify if the final comparison between Panaroo and BLAST should include neighbor information
 # this cannot be enabled successfully if you did not use neighbor_best_hit as the blast_summary_strategy
 neighbor_mode: "True"
+
+# blast thresholds
+# specify the minimum identity, minimum e-value, and minimum coverage for BLAST hits to be considered valid
+# also specify the maximum distance between the BLAST hit and potential neighbors when determining adjacency
+minimum_identity: 0.9
+minimum_evalue: 1e-5
+minimum_coverage: 0.9
+max_distance: 50000
+

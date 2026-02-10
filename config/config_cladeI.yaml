@@ -1,7 +1,7 @@
 # Configuration settings for Snakemake
 
 # run name
-prefix: "splice_neighbor_v5"
+prefix: "splice_neighbor_v7"
 
 # clade name (no spaces)
 clade: "clade_I"
@@ -59,3 +59,11 @@ blast_summary_strategy: "neighbor_best_hit"
 # specify if the final comparison between Panaroo and BLAST should include neighbor information
 # this cannot be enabled successfully if you did not use neighbor_best_hit as the blast_summary_strategy
 neighbor_mode: "True"
+
+# blast thresholds
+# specify the minimum identity, minimum e-value, and minimum coverage for BLAST hits to be considered valid
+# also specify the maximum distance between the BLAST hit and potential neighbors when determining adjacency
+minimum_identity: 0.9
+minimum_evalue: 1e-5
+minimum_coverage: 0.9
+max_distance: 50000

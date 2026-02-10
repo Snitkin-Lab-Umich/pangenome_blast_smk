@@ -54,21 +54,21 @@ def gff_neighbor_search_v2(blastdf, neighbor_df, max_distance):
     #print(f'Checking neighbors for gene family {query_gene_fam} in assembly {subject_assembly}')
     # get the corresponding row from the neighbor_df
     neighbor_data = neighbor_df[neighbor_df['GeneFamily'] == query_gene_fam]
-    if neighbor_data['Neighbor1_GeneName'].iloc[0] == 'absent' and neighbor_data['Neighbor2_GeneName'].iloc[0] != 'absent':
+    if neighbor_data['Neighbor1_Scaffold'].iloc[0] == 'absent' and neighbor_data['Neighbor2_Scaffold'].iloc[0] != 'absent':
         print('unexpected neighbor data format, neighbor 1 is absent but neighbor 2 is present!')
         quit(1)
     # count number of non-absent neighbors
-    if neighbor_data['Neighbor1_GeneName'].iloc[0] == 'absent':
+    if neighbor_data['Neighbor1_Scaffold'].iloc[0] == 'absent':
         neighbors_expected = 0
     else:
         neighbors_expected = 1
-        if neighbor_data['Neighbor2_GeneName'].iloc[0] != 'absent':
+        if neighbor_data['Neighbor2_Scaffold'].iloc[0] != 'absent':
             neighbors_expected = 2
     if neighbors_expected == 0:
         # do not search further if there are no expected neighbors
         return(neighbors_expected, 0)
     # for each neighbor position, check if it is on the same scaffold and within the max_distance of any of the BLAST hits
-    # for now, return a hit if any BLAST hit is in close proximity to any neighbor
+    # return the number of neighbors that meet this requirement
     blast_results = []
     for _, row in blastdf.iterrows():
         blast_outcome = 0
@@ -113,9 +113,31 @@ def main():
         help='''Provide a path to a directory containing neighbor data for accessory genes. Files should be in the format [isolate_name]_accessory_neighborfile.tsv.''',
         default=None
         )
+    parser.add_argument(
+        '--minimum_identity','-mi',type=float,
+        help='''Provide the minimum percent identity for BLAST hits.''',
+        default=0.9
+        )
+    parser.add_argument(
+        '--minimum_evalue','-me',type=float,
+        help='''Provide the minimum e-value for BLAST hits.''',
+        default=1e-5
+        )
+    parser.add_argument(
+        '--minimum_coverage','-mc',type=float,
+        help='''Provide the minimum coverage for BLAST hits.''',
+        default=0.9
+        )
+    parser.add_argument(
+        '--maximum_distance','-md',type=float,
+        help='''Provide the maximum distance from neighbors when evaluating BLAST hits.''',
+        default=50000
+        )
     args = parser.parse_args()
     blastdf = read_blast(args.input)
-    outdata = evaluate_blast_hits_v2(blastdf, args.neighbor_db, minimum_identity=0.8, minimum_evalue=1e-5, minimum_coverage=0.8, max_distance=50000)
+    outdata = evaluate_blast_hits_v2(
+        blastdf, args.neighbor_db, minimum_identity=args.minimum_identity, minimum_evalue=args.minimum_evalue, 
+        minimum_coverage=args.minimum_coverage, max_distance=args.maximum_distance)
     write_output_v2(outdata, args.output)
 
 if __name__ == '__main__':

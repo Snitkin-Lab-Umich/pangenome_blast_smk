@@ -9,8 +9,8 @@ CLADE = config["clade"]
 
 rule all:
     input:
-        comparison_output_high = expand("results/{PREFIX}/output2/panaroo_blast_comparison_HighConfidence_{PREFIX}_{CLADE}.tsv", PREFIX=PREFIX, CLADE=CLADE),
-        comparison_output_med = expand("results/{PREFIX}/output2/panaroo_blast_comparison_MediumConfidence_{PREFIX}_{CLADE}.tsv", PREFIX=PREFIX, CLADE=CLADE),
+        comparison_output_high = expand("results/{PREFIX}/output2/panaroo_blast_comparison_{PREFIX}_{CLADE}_high_confidence.tsv", PREFIX=PREFIX, CLADE=CLADE),
+        #comparison_output_med = expand("results/{PREFIX}/output2/panaroo_blast_comparison_MediumConfidence_{PREFIX}_{CLADE}.tsv", PREFIX=PREFIX, CLADE=CLADE),
         #blast_summary_output = expand("results/{PREFIX}/output1/blast_summary_output_{PREFIX}_{CLADE}.fasta", PREFIX=PREFIX, CLADE=CLADE),
         #pangenome_neighbors_complete = expand("results/{PREFIX}/neighbor_db/pangenome_neighbors_complete_{PREFIX}_{CLADE}.txt", PREFIX=PREFIX, CLADE=CLADE),
         #comparison_output = expand("results/{PREFIX}/output2/panaroo_blast_comparison_{PREFIX}_{CLADE}.fasta", PREFIX=PREFIX, CLADE=CLADE),
@@ -103,7 +103,7 @@ rule find_pangenome_neighbors:
         pan_graph = config["pangenome_graph"],
         gff_dir = config["gff_dir"],
     resources:
-        mem_mb = 20000,
+        mem_mb = 40000,
         runtime = 600,
     threads: 1
     conda:
@@ -122,12 +122,11 @@ rule find_pangenome_neighbors:
         fi
         """
 
-rule summarize_blast_results:
+rule summarize_neighbor_db:
     input:
-        blast_raw_output = "results/{PREFIX}/output1/blast_raw_output_{PREFIX}_{CLADE}.tsv",
         pangenome_neighbors_complete = "results/{PREFIX}/neighbor_db/{CLADE}/pangenome_neighbors_complete_{PREFIX}_{CLADE}.txt",
     output:
-        blast_summary_output = "results/{PREFIX}/output1/blast_summary_output_{PREFIX}_{CLADE}.tsv",
+        neighbor_summary = "results/{PREFIX}/output2/neighborDB_summary_{PREFIX}_{CLADE}.tsv",
     params:
         neighbor_db = "results/{PREFIX}/neighbor_db/{CLADE}/",
     resources:
@@ -138,20 +137,49 @@ rule summarize_blast_results:
         'biopython'
     shell:
         """
+        python3.12 scripts/summarize_neighbor_db.py --neighbor_db {params.neighbor_db} --output {output.neighbor_summary}
+        """
+
+rule summarize_blast_results:
+    input:
+        blast_raw_output = "results/{PREFIX}/output1/blast_raw_output_{PREFIX}_{CLADE}.tsv",
+        neighbor_summary = "results/{PREFIX}/output2/neighborDB_summary_{PREFIX}_{CLADE}.tsv",
+        pangenome_neighbors_complete = "results/{PREFIX}/neighbor_db/{CLADE}/pangenome_neighbors_complete_{PREFIX}_{CLADE}.txt",
+    output:
+        blast_summary_output = "results/{PREFIX}/output1/blast_summary_output_{PREFIX}_{CLADE}.tsv",
+    params:
+        neighbor_db = "results/{PREFIX}/neighbor_db/{CLADE}/",
+        minimum_identity = config.get("minimum_identity", 0.9),
+        minimum_evalue = config.get("minimum_evalue", 1e-5),
+        minimum_coverage = config.get("minimum_coverage", 0.9),
+        max_distance = config.get("max_distance", 50000),
+    resources:
+        mem_mb = 15000,
+        runtime = 600,
+    threads: 1
+    conda:
+        'biopython'
+    shell:
+        """
         python3.12 scripts/read_blast_neighbors_v2.py --input {input.blast_raw_output} --output {output.blast_summary_output} \
-        --neighbor_db {params.neighbor_db}
+        --neighbor_db {params.neighbor_db} --minimum_identity {params.minimum_identity} --minimum_evalue {params.minimum_evalue} \
+        --minimum_coverage {params.minimum_coverage} --maximum_distance {params.max_distance}
         """
 
-rule compare_panaroo_blast_high_confidence:
+
+rule compare_panaroo_blast:
     input:
         blast_summary_output = "results/{PREFIX}/output1/blast_summary_output_{PREFIX}_{CLADE}.tsv",
     output:
-        comparison_output_high = "results/{PREFIX}/output2/panaroo_blast_comparison_HighConfidence_{PREFIX}_{CLADE}.tsv",
+        comparison_output_high = "results/{PREFIX}/output2/panaroo_blast_comparison_{PREFIX}_{CLADE}_high_confidence.tsv",
+        comparison_output_medium = "results/{PREFIX}/output2/panaroo_blast_comparison_{PREFIX}_{CLADE}_medium_confidence.tsv",
+        comparison_output_low = "results/{PREFIX}/output2/panaroo_blast_comparison_{PREFIX}_{CLADE}_low_confidence.tsv",
     params:
         matrix = config["pangenome_matrix"],
         filterfile = config.get("filterfile", None),
         neighbor_mode = config.get("neighbor_mode", False),
-        confidence_level = 'high_confidence',
+        confidence_level = 'all',
+        output_filename = "results/{PREFIX}/output2/panaroo_blast_comparison_{PREFIX}_{CLADE}.tsv",
     resources:
         mem_mb = 8000,
         runtime = 600,
@@ -161,31 +189,8 @@ rule compare_panaroo_blast_high_confidence:
     shell:
         """
         python3.12 scripts/compare_panaroo_blast_v2.py --blast {input.blast_summary_output} --panaroo {params.matrix} \
-        --output {output.comparison_output_high} --filterfile {params.filterfile} --neighbor_mode {params.neighbor_mode} \
+        --output {params.output_filename} --filterfile {params.filterfile} --neighbor_mode {params.neighbor_mode} \
         --confidence {params.confidence_level}
         """
 
-
-rule compare_panaroo_blast_medium_confidence:
-    input:
-        blast_summary_output = "results/{PREFIX}/output1/blast_summary_output_{PREFIX}_{CLADE}.tsv",
-    output:
-        comparison_output_med = "results/{PREFIX}/output2/panaroo_blast_comparison_MediumConfidence_{PREFIX}_{CLADE}.tsv",
-    params:
-        matrix = config["pangenome_matrix"],
-        filterfile = config.get("filterfile", None),
-        neighbor_mode = config.get("neighbor_mode", False),
-        confidence_level = 'medium_confidence',
-    resources:
-        mem_mb = 8000,
-        runtime = 600,
-    threads: 1
-    conda:
-        'biopython'
-    shell:
-        """
-        python3.12 scripts/compare_panaroo_blast_v2.py --blast {input.blast_summary_output} --panaroo {params.matrix} \
-        --output {output.comparison_output_med} --filterfile {params.filterfile} --neighbor_mode {params.neighbor_mode} \
-        --confidence {params.confidence_level}
-        """
 

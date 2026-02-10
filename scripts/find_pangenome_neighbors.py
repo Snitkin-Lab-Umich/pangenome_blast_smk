@@ -70,29 +70,72 @@ def neighbor_search(gene_family, isolate, neighbor_dict, gff_db, pan_matrix):
     #print(f'initial neighbor list: {neighbor_list}')
     present_neighbor_dict = {}
     for neighbor in neighbor_list:
+        # print(f'finding present neighbor for gene family {gene_family} neighbor {neighbor} in isolate {isolate}')
         # check if these neighbors are actually present in this assembly, based on the pangenome matrix
-        # if they are not, use the next neighbor (if one exists)
-        target_genefam = neighbor
-        genes_seen = []
-        target_genefam_GeneName_string = pan_matrix.loc[pan_matrix['Gene'] == target_genefam, isolate].iloc[0]
-        target_genefam_GeneName = gene_name_checker_paralogskip(target_genefam_GeneName_string)
+        # if they are not, attempt to locate the nearest present neighbor by traversing the pangenome graph
+        # start with a list of genes to check for presence
+        target_genefam_list = [neighbor]
+        target_genefam = None
+        # make sure we do not traverse backwards towards the original gene family
+        genes_seen = [gene_family]
+        target_genefam_GeneName = False
         while not target_genefam_GeneName:
-            genes_seen.append(target_genefam)
-            next_neighbors = neighbor_dict.get(target_genefam, [])
-            # remove any previously seen genes to avoid infinite loops
-            next_neighbors = [x for x in next_neighbors if x not in genes_seen]
-            if next_neighbors == [] or len(genes_seen) > 20:
-                # this means no present neighbors were found in this isolate
-                present_neighbor_dict[target_genefam] = 'not_found'
+            # print(target_genefam_list)
+            # print(target_genefam)
+            # print(genes_seen)
+            # print(target_genefam_GeneName)
+            # if there are no more neighbors to check, or if we have searched more than 20 genes, give up and mark as not_found
+            if target_genefam_list == [] or len(genes_seen) > 20:
+                present_neighbor_dict[neighbor] = 'not_found'
                 target_genefam = None
                 break
-            # if there are multiple next neighbors, just take the first one
-            # note that dead ends will make the neighbor search terminate early if the second neighbor is the 'correct' path
-            target_genefam = next_neighbors[0]
+            # take the first gene family from the list
+            target_genefam = target_genefam_list.pop(0)
+            # add to the list of genes already seen
+            genes_seen.append(target_genefam)
+            # check if this gene family is present
             target_genefam_GeneName_string = pan_matrix.loc[pan_matrix['Gene'] == target_genefam, isolate].iloc[0]
             target_genefam_GeneName = gene_name_checker_paralogskip(target_genefam_GeneName_string)
+            # find the next neighbors of this gene family (which can be none or multiple)
+            next_neighbors = neighbor_dict.get(target_genefam, [])
+            # exclude any previously seen genes
+            next_neighbors = [x for x in next_neighbors if x not in genes_seen]
+            for n in next_neighbors:
+                if n not in target_genefam_list:
+                    target_genefam_list.append(n)
+        # if a present neighbor was successfully found, add it to the present_neighbor_dict
+        # note that it is possible for multiple neighbors to resolve into the same target_genefam through this method (if the pangenome graph makes a loop)
+        # if this happens, repeatedly append _REP to the gene name until it is unique
         if target_genefam is not None:
+            while target_genefam in present_neighbor_dict.keys():
+                target_genefam += '_REP'
             present_neighbor_dict[target_genefam] = target_genefam_GeneName
+        # target_genefam = neighbor
+        # target_genefam_list = []
+        # genes_seen = []
+        # target_genefam_GeneName_string = pan_matrix.loc[pan_matrix['Gene'] == target_genefam, isolate].iloc[0]
+        # target_genefam_GeneName = gene_name_checker_paralogskip(target_genefam_GeneName_string)
+        # while not target_genefam_GeneName:
+        #     genes_seen.append(target_genefam)
+        #     next_neighbors = neighbor_dict.get(target_genefam, [])
+        #     # remove any previously seen genes to avoid infinite loops
+        #     next_neighbors = [x for x in next_neighbors if x not in genes_seen]
+        #     # if there are multiple next neighbors, just take the first one
+        #     # note that dead ends will make the neighbor search terminate early if the second neighbor is the 'correct' path
+        #     # target_genefam = next_neighbors[0]
+        #     # append all next neighbors to the target_genefam_list, trying each one at a time
+        #     target_genefam_list.extend(next_neighbors)
+        #     # if the target_genefam_list is empty, then no present neighbors were found and no further searching can be performed
+        #     # (also stop if more than 20 genes have been searched)
+        #     if target_genefam_list == [] or len(genes_seen) > 20:
+        #         present_neighbor_dict[target_genefam] = 'not_found'
+        #         target_genefam = None
+        #         break
+        #     # otherwise, take the next gene family from the target_genefam_list and use it as target_genefam
+        #     target_genefam_GeneName_string = pan_matrix.loc[pan_matrix['Gene'] == target_genefam, isolate].iloc[0]
+        #     target_genefam_GeneName = gene_name_checker_paralogskip(target_genefam_GeneName_string)
+        # if target_genefam is not None:
+        #     present_neighbor_dict[target_genefam] = target_genefam_GeneName
     # the neighbor dict should now consist only of neighboring gene families that are actually present in this assembly
     #print(f'present neighbor list: {present_neighbor_list}')
     # first, determine if any missing neighbors are due to the pangenome graph not containing neighbors, or due to a failure to find present neighbors in this isolate
@@ -173,6 +216,7 @@ def create_neighbor_table(accessory_gene_list, isolate_list, pan_matrix, pan_gra
             gff_file = f'{gff_dir}/{isolate}.gff'
             gff_db = gff.create_db(gff_file,dbfn=":memory:",force=True,keep_order=False,merge_strategy="create_unique",sort_attribute_values=True,from_string=False)
             for genefam in accessory_gene_list:
+                #print(f'starting gene family {genefam} in isolate {isolate}')
                 # determine if this gene family is present in this isolate
                 genefam_GeneName_string = pan_matrix.loc[pan_matrix['Gene'] == genefam, isolate].iloc[0]
                 genefam_GeneName = gene_name_checker(genefam_GeneName_string)

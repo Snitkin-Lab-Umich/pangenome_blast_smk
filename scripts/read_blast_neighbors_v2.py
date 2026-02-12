@@ -8,7 +8,7 @@ def write_output_v2(outdata, output_file):
         _ = out_f.write('Query_SeqID\tSubject_SeqID\tExpected_Neighbors\tMax_Neighbors_in_BLAST\n')
         for query_seqid, subject_hit_data_list in outdata.items():
             if subject_hit_data_list == []:
-                subject_hit_data = [('None','0','0')]
+                subject_hit_data_list = [('None','0','0')]
             for subject_hit_data in subject_hit_data_list:
                 assembly_name, neighbors_expected, max_neighbors_of_blast_hit = subject_hit_data
                 out_f.write(f'{query_seqid}\t{assembly_name}\t{neighbors_expected}\t{max_neighbors_of_blast_hit}\n')

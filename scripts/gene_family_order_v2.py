@@ -27,8 +27,8 @@ def gene_family_order(input_file, gff_file, output_file, splice_mode=False):
                 if neighbor1_scaffold != gf_scaffold or neighbor2_scaffold != gf_scaffold:
                     print(f'Error: gff returned {neighbor1_scaffold} and {neighbor2_scaffold} when {gf_scaffold} was expected.')
                     quit(1)
-                gf_start = (int(neighbor1_start) + int(neighbor2_start)) // 2
-                gf_end = (int(neighbor1_end) + int(neighbor2_end)) // 2
+                gf_start = min(int(neighbor1_start) + int(neighbor2_start))
+                gf_end = max(int(neighbor1_end) + int(neighbor2_end))
             # if only one neighbor is present, or they are on different scaffolds, use the coordinates of the first neighbor
             # (there should never be a case where the first neighbor is absent but the second is present)
             elif row['Neighbor1_Scaffold'] != 'absent':
@@ -73,10 +73,10 @@ def get_gene_data_from_gff(gff_db, gene_name_cds, splice_mode=False):
     # return the scaffold, start, and end coordinates of the mRNA feature corresponding to this gene name
     # if splice_mode is True, instead return the coordinates of the CDS feature itself (since this assumes a spliced gff was used)
     gene_feature_cds = gff_db[gene_name_cds]
-    gene_feature_mrna = gff_db[gene_feature_cds.attributes['Parent'][0]]
     if splice_mode:
         return gene_feature_cds.seqid, gene_feature_cds.start, gene_feature_cds.end
     else:
+        gene_feature_mrna = gff_db[gene_feature_cds.attributes['Parent'][0]]
         return gene_feature_mrna.seqid, gene_feature_mrna.start, gene_feature_mrna.end
 
 def main():

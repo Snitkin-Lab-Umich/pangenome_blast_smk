@@ -1,0 +1,41 @@
+#!/bin/bash
+
+#SBATCH --mail-user=jjhale@umich.edu
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --export=ALL
+#SBATCH --partition=standard
+#SBATCH --account=esnitkin1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=15g
+#SBATCH --time=16:00:00
+
+source ~/miniconda3/etc/profile.d/conda.sh
+conda activate biopython
+
+python scripts/gene_family_order_v2.py -i results/splice_neighbor_v7/neighbor_db/clade_I/b8441_accessory_neighborfile.tsv \
+-o results/splice_neighbor_v7/output2/cladeI_b8441_estimated_gene_order_unspliced_v2.tsv \
+--gff /nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline_testing/2025-09-25_pvo/092525_pangenome_results/original_gff/b8441.gff3
+
+python scripts/gene_family_order_v2.py -i results/splice_neighbor_v7/neighbor_db/clade_III/UM_Caur_4_accessory_neighborfile.tsv \
+-o results/splice_neighbor_v7/output2/cladeIII_UMCaur4_estimated_gene_order_unspliced_v2.tsv \
+--gff /nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline_testing/2025-09-25_pvo/092525_pangenome_results/original_gff/UM_Caur_4.gff3
+
+python scripts/gene_family_order_v2.py -i results/splice_neighbor_v7/neighbor_db/clade_IV/Chi_Caur_3_accessory_neighborfile.tsv \
+-o results/splice_neighbor_v7/output2/cladeIV_ChiCaur3_estimated_gene_order_unspliced_v2.tsv \
+--gff /nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline_testing/2025-09-25_pvo/092525_pangenome_results/original_gff/Chi_Caur_3.gff3
+
+
+python scripts/gene_family_order_v2.py -i results/splice_neighbor_v7/neighbor_db/clade_I/b8441_accessory_neighborfile.tsv \
+-o results/splice_neighbor_v7/output2/cladeI_b8441_estimated_gene_order_spliced_v2.tsv --splice_mode \
+--gff /nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline_testing/2025-09-25_pvo/092525_pangenome_results/original_gff_spliceIntrons/b8441.gff3
+
+python scripts/gene_family_order_v2.py -i results/splice_neighbor_v7/neighbor_db/clade_III/UM_Caur_4_accessory_neighborfile.tsv \
+-o results/splice_neighbor_v7/output2/cladeIII_UMCaur4_estimated_gene_order_spliced_v2.tsv --splice_mode \
+--gff /nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline_testing/2025-09-25_pvo/092525_pangenome_results/original_gff_spliceIntrons/UM_Caur_4.gff3
+
+python scripts/gene_family_order_v2.py -i results/splice_neighbor_v7/neighbor_db/clade_IV/Chi_Caur_3_accessory_neighborfile.tsv \
+-o results/splice_neighbor_v7/output2/cladeIV_ChiCaur3_estimated_gene_order_spliced_v2.tsv --splice_mode \
+--gff /nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline_testing/2025-09-25_pvo/092525_pangenome_results/original_gff_spliceIntrons/Chi_Caur_3.gff3
+
+

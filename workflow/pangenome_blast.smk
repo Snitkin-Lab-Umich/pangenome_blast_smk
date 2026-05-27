@@ -9,7 +9,8 @@ CLADE = config["clade"]
 
 rule all:
     input:
-        comparison_output_high = expand("results/{PREFIX}/output2/panaroo_blast_comparison_{PREFIX}_{CLADE}_high_confidence.tsv", PREFIX=PREFIX, CLADE=CLADE),
+        comparison_table = expand("results/{PREFIX}/output2/panaroo_blast_comparison_{PREFIX}_{CLADE}.tsv", PREFIX=PREFIX, CLADE=CLADE),
+        #comparison_output_high = expand("results/{PREFIX}/output2/panaroo_blast_comparison_{PREFIX}_{CLADE}_high_confidence.tsv", PREFIX=PREFIX, CLADE=CLADE),
         #comparison_output_med = expand("results/{PREFIX}/output2/panaroo_blast_comparison_MediumConfidence_{PREFIX}_{CLADE}.tsv", PREFIX=PREFIX, CLADE=CLADE),
         #blast_summary_output = expand("results/{PREFIX}/output1/blast_summary_output_{PREFIX}_{CLADE}.fasta", PREFIX=PREFIX, CLADE=CLADE),
         #pangenome_neighbors_complete = expand("results/{PREFIX}/neighbor_db/pangenome_neighbors_complete_{PREFIX}_{CLADE}.txt", PREFIX=PREFIX, CLADE=CLADE),
@@ -26,6 +27,7 @@ rule extract_accessory_gene_sequences:
         gff_dir = config["gff_dir"],
         matrix = config["pangenome_matrix"],
         filterfile = config.get("filterfile", None),
+        spliced_gff = config.get("spliced_gff", True),
     resources:
         mem_mb = 4000,
         runtime = 60,
@@ -35,7 +37,7 @@ rule extract_accessory_gene_sequences:
     shell:
         """
         python3.12 scripts/extract_gene_from_isolate.py --input {input.accessory_gene_list} --output {output.accessory_gene_sequences} \
-        --assemblies {params.assemblies_dir} --gff {params.gff_dir} --pangenome {params.matrix} --filterfile {params.filterfile}
+        --assemblies {params.assemblies_dir} --gff {params.gff_dir} --pangenome {params.matrix} --filterfile {params.filterfile} --spliced_gff {params.spliced_gff}
         """
 
 
@@ -77,7 +79,6 @@ rule caurisblast:
         """
         # if the subject is a fasta file, use it with the -d flag 
         # otherwise, assume blastdb generation is needed and exclude the -d flag
-        # caurisblast/results/{params.batch_name}/{params.batch_name}_nucl_blastn_{params.eval_threshold}_blast_results.csv
         if [[ "{params.blast_subject}" == *.fasta || "{params.blast_subject}" == *.fa ]]; then
             python3.12 caurisblast/blast.py -q {input.accessory_gene_sequences} -s {params.blast_subject} \
             -th {threads} -e {params.eval_threshold} -w {params.wordsize} -k blastn -t nucl -v \
@@ -148,6 +149,8 @@ rule summarize_blast_results:
     output:
         blast_summary_output = "results/{PREFIX}/output1/blast_summary_output_{PREFIX}_{CLADE}.tsv",
     params:
+        matrix = config["pangenome_matrix"],
+        filterfile = config.get("filterfile", None),
         neighbor_db = "results/{PREFIX}/neighbor_db/{CLADE}/",
         minimum_identity = config.get("minimum_identity", 0.9),
         minimum_evalue = config.get("minimum_evalue", 1e-5),
@@ -163,7 +166,7 @@ rule summarize_blast_results:
         """
         python3.12 scripts/read_blast_neighbors_v2.py --input {input.blast_raw_output} --output {output.blast_summary_output} \
         --neighbor_db {params.neighbor_db} --minimum_identity {params.minimum_identity} --minimum_evalue {params.minimum_evalue} \
-        --minimum_coverage {params.minimum_coverage} --maximum_distance {params.max_distance}
+        --minimum_coverage {params.minimum_coverage} --maximum_distance {params.max_distance} --panaroo {params.matrix} --filterfile {params.filterfile}
         """
 
 
@@ -171,15 +174,16 @@ rule compare_panaroo_blast:
     input:
         blast_summary_output = "results/{PREFIX}/output1/blast_summary_output_{PREFIX}_{CLADE}.tsv",
     output:
-        comparison_output_high = "results/{PREFIX}/output2/panaroo_blast_comparison_{PREFIX}_{CLADE}_high_confidence.tsv",
-        comparison_output_medium = "results/{PREFIX}/output2/panaroo_blast_comparison_{PREFIX}_{CLADE}_medium_confidence.tsv",
-        comparison_output_low = "results/{PREFIX}/output2/panaroo_blast_comparison_{PREFIX}_{CLADE}_low_confidence.tsv",
+        #comparison_output_high = "results/{PREFIX}/output2/panaroo_blast_comparison_{PREFIX}_{CLADE}_high_confidence.tsv",
+        #comparison_output_medium = "results/{PREFIX}/output2/panaroo_blast_comparison_{PREFIX}_{CLADE}_medium_confidence.tsv",
+        #comparison_output_low = "results/{PREFIX}/output2/panaroo_blast_comparison_{PREFIX}_{CLADE}_low_confidence.tsv",
+        comparison_table = "results/{PREFIX}/output2/panaroo_blast_comparison_{PREFIX}_{CLADE}.tsv",
     params:
         matrix = config["pangenome_matrix"],
         filterfile = config.get("filterfile", None),
         neighbor_mode = config.get("neighbor_mode", False),
         confidence_level = 'all',
-        output_filename = "results/{PREFIX}/output2/panaroo_blast_comparison_{PREFIX}_{CLADE}.tsv",
+        #output_filename = "results/{PREFIX}/output2/panaroo_blast_comparison_{PREFIX}_{CLADE}.tsv",
     resources:
         mem_mb = 8000,
         runtime = 600,
@@ -189,7 +193,7 @@ rule compare_panaroo_blast:
     shell:
         """
         python3.12 scripts/compare_panaroo_blast_v2.py --blast {input.blast_summary_output} --panaroo {params.matrix} \
-        --output {params.output_filename} --filterfile {params.filterfile} --neighbor_mode {params.neighbor_mode} \
+        --output {output.comparison_table} --filterfile {params.filterfile} --neighbor_mode {params.neighbor_mode} \
         --confidence {params.confidence_level}
         """
 

@@ -6,7 +6,8 @@ prefix: "splice_neighbor_v6"
 # clade name (no spaces)
 clade: "clade_I"
 
-
+# specify if spliced gff files are being used
+spliced_gff: "True"
 
 ### clade-specific information
 

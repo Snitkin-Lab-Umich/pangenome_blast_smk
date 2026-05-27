@@ -5,7 +5,7 @@ import argparse
 import gffutils as gff
 import pandas as pd
 
-def extract_sequences(input_file, assemblies_dir, gff_dir, pangenome_file, filterfile, output_file):
+def extract_sequences(input_file, assemblies_dir, gff_dir, pangenome_file, filterfile, spliced_gff,output_file):
     # steps for each gene family
     # 1) read the pangenome matrix, get the row that matches the gene family name
     # 2) get the list of isolates that actually have that gene family
@@ -49,7 +49,7 @@ def extract_sequences(input_file, assemblies_dir, gff_dir, pangenome_file, filte
             if isolate_gene_dict == {}:
                 print(f'Warning: no searchable genes found in gene family {genefam} at all')
                 continue
-            isolate, gene_name = find_best_gene(isolate_gene_dict, gff_dir)
+            isolate, gene_name = find_best_gene(isolate_gene_dict)
             # remove the .cds suffix from the gene name to extract the mRNA feature rather than the CDS feature
             # if using the spliced data, use the CDS name instead
             #gene_name_mrna = gene_name.replace('.cds', '')
@@ -61,7 +61,7 @@ def extract_sequences(input_file, assemblies_dir, gff_dir, pangenome_file, filte
                 print(f'Unable to locate gff file for isolate {isolate} at {gff_file}')
                 continue
             fasta_file = os.path.join(assemblies_dir, f'{isolate}.scaffolds.fa')
-            query_fasta_record = extract_record_from_gff(gff_file, fasta_file, gene_name_mrna)
+            query_fasta_record = extract_record_from_gff(gff_file, fasta_file, gene_name_mrna, spliced_gff)
             #print(f'Found gene {query_fasta_record.id} in isolate {isolate} for gene family {genefam}')
             #print(f'gff: {gff_file}, fasta: {fasta_file}, gene_name: {gene_name_mrna}')
             # write the record to the output fasta file
@@ -100,14 +100,20 @@ def make_isolate_dict(genefam, pan):
         # isolate_gene_dict[isolate] = gene_name
     return isolate_gene_dict
 
-def extract_record_from_gff(gff_file, fasta_file, gene_name):
+def extract_record_from_gff(gff_file, fasta_file, gene_name, spliced_gff = True):
     # parse the gff file to get the start and end positions of the gene
     db = gff.create_db(gff_file, dbfn=':memory:', force=True, keep_order=True, merge_strategy='merge', sort_attribute_values=True)
-    gene_feature = db[gene_name]
+    # this 'gene_name' is actually the name of the cds feature
+    cds_feature = db[gene_name]
+    if spliced_gff:
+        gene_feature = cds_feature
+    else:
+        # if this get the mRNA feature for this cds
+        # in most cases, the coordinates of the mRNA and CDS features are the same, but this should account for cases where an intron creates multiple CDS features
+        gene_feature = db[cds_feature.attributes['Parent'][0]]
     seqid = gene_feature.seqid
     start = gene_feature.start
     end = gene_feature.end
-    strand = gene_feature.strand
     # extract the sequence from the fasta file
     #print(f'Extracting sequence for gene {gene_name} from {fasta_file}, seqid: {seqid}, start: {start}, end: {end}, strand: {strand}')
     for record in SeqIO.parse(fasta_file, 'fasta'):
@@ -119,8 +125,7 @@ def extract_record_from_gff(gff_file, fasta_file, gene_name):
     quit(1)
 
 
-
-def find_best_gene(isolate_gene_dict, gff_dir):
+def find_best_gene(isolate_gene_dict):
     # take a dict of isolate:gene_name
     # eventually, this will need to compare lengths/quality of sequences
     # for now, simply prioritize any isolates that start with UM_ or Chi_, as these are hybrid assemblies
@@ -136,6 +141,7 @@ def find_best_gene(isolate_gene_dict, gff_dir):
     # some gene names are actually lists of multiple genes separated by a semicolon
     if ';' in final_gene_name:
         final_gene_name = final_gene_name.split(';')[0]
+        print(f'Warning: paralogs found for gene family {final_gene_name} in isolate {final_isolate}. Using only the first gene.')
     return final_isolate, final_gene_name
 
 
@@ -173,8 +179,13 @@ def main():
         help='''Provide the path to the output file. This will be a fasta file with a single entry for each gene family in the input list.''',
         default=None
         )
+    parser.add_argument(
+        '--spliced_gff','-sgff',type=bool,
+        help='''Specify if the gff files provided have their introns spliced out. If this is False, mRNA annotations will be used as coordinates instead of CDS annotations to account for introns.''',
+        default=True
+        )
     args = parser.parse_args()
-    extract_sequences(args.input, args.assemblies, args.gff, args.pangenome, args.filterfile,args.output)
+    extract_sequences(args.input, args.assemblies, args.gff, args.pangenome, args.filterfile, args.spliced_gff,args.output)
 
 
 if __name__ == '__main__':

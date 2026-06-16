@@ -91,12 +91,37 @@ rule caurisblast:
         mv caurisblast/results/{params.batch_name}/{params.batch_name}_nucl_blastn_{params.eval_threshold}_blast_results.csv {output.blast_raw_output}
         """
 
+
+rule add_annotations_to_blast:
+    input:
+        blast_raw_output = "results/{PREFIX}/output1/blast_raw_output_{PREFIX}_{CLADE}.tsv",
+    output:
+        blast_annotated_output = "results/{PREFIX}/output1/blast_annotated_output_{PREFIX}_{CLADE}.tsv",
+    params:
+        gff_dir = config["gff_dir"],
+        pangenome_names = config["pangenome_matrix"],
+        pangenome_numbers = config["pangenome_categories"],
+        clade_name = config["clade"],
+    resources:
+        mem_mb = 30000,
+        runtime = 1200,
+    threads: 1
+    conda:
+        'biopython'
+    shell:
+        """
+        python3.12 scripts/add_annotations_to_blast.py --input {input.blast_raw_output} --output {output.blast_annotated_output} \
+        --gff_dir {params.gff_dir} --pangenome_names {params.pangenome_names} --pangenome_numbers {params.pangenome_numbers} --clade_name {params.clade_name}
+        """
+
+
 rule find_pangenome_neighbors:
     input:
         blast_raw_output = "results/{PREFIX}/output1/blast_raw_output_{PREFIX}_{CLADE}.tsv",
     output:
         pangenome_neighbors_complete = "results/{PREFIX}/neighbor_db/{CLADE}/pangenome_neighbors_complete_{PREFIX}_{CLADE}.txt",
     params:
+        spliced_gff = config.get("spliced_gff", True),
         out_dir = "results/{PREFIX}/neighbor_db/{CLADE}/",
         accessory_gene_list = config["accessory_gene_list"],
         isolate_list = config["filterfile"],
@@ -113,7 +138,7 @@ rule find_pangenome_neighbors:
         """
         python3.12 scripts/find_pangenome_neighbors.py --accessory_list {params.accessory_gene_list} --isolate_list {params.isolate_list} \
         --pan_matrix {params.pan_matrix} --pan_graph {params.pan_graph} --gff_dir {params.gff_dir} \
-        --out_dir {params.out_dir}
+        --out_dir {params.out_dir} --spliced_gff {params.spliced_gff}
         exitcode=$?
         if [ $exitcode == 0 ]; then
             touch {output.pangenome_neighbors_complete}
@@ -143,7 +168,7 @@ rule summarize_neighbor_db:
 
 rule summarize_blast_results:
     input:
-        blast_raw_output = "results/{PREFIX}/output1/blast_raw_output_{PREFIX}_{CLADE}.tsv",
+        blast_annotated_output = "results/{PREFIX}/output1/blast_annotated_output_{PREFIX}_{CLADE}.tsv",
         neighbor_summary = "results/{PREFIX}/output2/neighborDB_summary_{PREFIX}_{CLADE}.tsv",
         pangenome_neighbors_complete = "results/{PREFIX}/neighbor_db/{CLADE}/pangenome_neighbors_complete_{PREFIX}_{CLADE}.txt",
     output:
@@ -156,6 +181,8 @@ rule summarize_blast_results:
         minimum_evalue = config.get("minimum_evalue", 1e-5),
         minimum_coverage = config.get("minimum_coverage", 0.9),
         max_distance = config.get("max_distance", 50000),
+        overlap_threshold = config.get("overlap_threshold", 0.1),
+        accessory_gene_list = config["accessory_gene_list"],
     resources:
         mem_mb = 15000,
         runtime = 600,
@@ -164,9 +191,10 @@ rule summarize_blast_results:
         'biopython'
     shell:
         """
-        python3.12 scripts/read_blast_neighbors_v2.py --input {input.blast_raw_output} --output {output.blast_summary_output} \
+        python3.12 scripts/read_blast_neighbors_v3.py --input {input.blast_annotated_output} --output {output.blast_summary_output} \
         --neighbor_db {params.neighbor_db} --minimum_identity {params.minimum_identity} --minimum_evalue {params.minimum_evalue} \
-        --minimum_coverage {params.minimum_coverage} --maximum_distance {params.max_distance} --panaroo {params.matrix} --filterfile {params.filterfile}
+        --minimum_coverage {params.minimum_coverage} --maximum_distance {params.max_distance} --pangenome {params.matrix} --filterfile {params.filterfile} \
+        --overlap_threshold {params.overlap_threshold} --gene_list {params.accessory_gene_list}
         """
 
 
@@ -178,6 +206,7 @@ rule compare_panaroo_blast:
         #comparison_output_medium = "results/{PREFIX}/output2/panaroo_blast_comparison_{PREFIX}_{CLADE}_medium_confidence.tsv",
         #comparison_output_low = "results/{PREFIX}/output2/panaroo_blast_comparison_{PREFIX}_{CLADE}_low_confidence.tsv",
         comparison_table = "results/{PREFIX}/output2/panaroo_blast_comparison_{PREFIX}_{CLADE}.tsv",
+        neighbor_table = "results/{PREFIX}/output2/panaroo_blast_neighbor_comparison_{PREFIX}_{CLADE}.tsv",
     params:
         matrix = config["pangenome_matrix"],
         filterfile = config.get("filterfile", None),
@@ -192,9 +221,8 @@ rule compare_panaroo_blast:
         'biopython'
     shell:
         """
-        python3.12 scripts/compare_panaroo_blast_v2.py --blast {input.blast_summary_output} --panaroo {params.matrix} \
-        --output {output.comparison_table} --filterfile {params.filterfile} --neighbor_mode {params.neighbor_mode} \
-        --confidence {params.confidence_level}
+        python3.12 scripts/compare_panaroo_blast_v3.py --blast {input.blast_summary_output} --panaroo {params.matrix} \
+        --output_overlap {output.comparison_table} --output_neighbors {output.neighbor_table} --filterfile {params.filterfile}
         """
 
 

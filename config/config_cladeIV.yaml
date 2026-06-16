@@ -1,11 +1,10 @@
 # Configuration settings for Snakemake
 
 # run name
-prefix: "splice_neighbor_v7"
+prefix: "splice_neighbor_v14"
 
 # clade name (no spaces)
 clade: "clade_IV"
-
 
 
 ### clade-specific information
@@ -26,10 +25,16 @@ assemblies_dir: "/nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline_
 
 # directory of GFF files used in Panaroo
 gff_dir: "/nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline_testing/2025-09-25_pvo/092525_pangenome_results/prokka_gff_spliceIntrons/"
+# specify if these are intron-spliced gff files or not
+spliced_gff: "True"
 
 # presence/absence matrix file from Panaroo output
 # this should contain gene names for each isolate
 pangenome_matrix: "/nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline_testing/2025-09-25_pvo/092525_pangenome_results/accessory_blast_search/input/gene_presence_absence_splice_processed_names_v1.csv"
+
+# presence/absence matrix file from Panaroo output, with gene family categories included
+# this should contain numbers for presence/absence rather than gene names
+pangenome_categories: "/nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline_testing/2025-09-25_pvo/092525_pangenome_results/accessory_blast_search/input/gene_presence_absence_splice_processed_values_CladeSpecific_v2.csv"
 
 # pangenome graph file from Panaroo output
 pangenome_graph: "/nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline_testing/2025-09-25_pvo/092525_pangenome_results/accessory_blast_search/input/panaroo_out_v2_spliceIntrons_final_graph.gml"
@@ -40,9 +45,9 @@ pangenome_graph: "/nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline
 # blast subject
 # this can either be an existing blast database (ending in .fasta or .fa), or a directory of fasta files
 # if a directory is provided, a blast database will be created for the next run
-blast_subject: "/nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline_testing/2025-09-25_pvo/092525_pangenome_results/accessory_blast_search/blast_db/cladeIV_splice/splice_neighbor_v4_clade_IV/splice_neighbor_v4_clade_IV_blastdb.fasta"
+blast_subject: "/nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline_testing/2025-09-25_pvo/092525_pangenome_results/nucleotide_fasta_spliceIntrons/"
 #blast_subject: "/nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline_testing/2025-09-25_pvo/092525_pangenome_results/accessory_blast_search/blast_db/cladeI_splice/cladeI_pangenome_isolates_SPLICED_v3/cladeI_pangenome_isolates_SPLICED_v3_blastdb.fasta"
-
+#blast_subject: "/nfs/turbo/umms-esnitkin/Project_Cauris/Analysis/2024_Pipeline_testing/2025-09-25_pvo/092525_pangenome_results/accessory_blast_search/blast_db/cladeI_splice/cladeI_pangenome_isolates_SPLICED_v11/splice_neighbor_v11_clade_I_blastdb.fasta"
 
 # caurisblast repo address
 caurisblast_repo: "https://github.com/Snitkin-Lab-Umich/caurisblast"
@@ -62,9 +67,12 @@ neighbor_mode: "True"
 
 # blast thresholds
 # specify the minimum identity, minimum e-value, and minimum coverage for BLAST hits to be considered valid
-# also specify the maximum distance between the BLAST hit and potential neighbors when determining adjacency
 minimum_identity: 0.9
 minimum_evalue: 1e-5
 minimum_coverage: 0.9
+# also specify the maximum distance between the BLAST hit and potential neighbors when determining adjacency
+# if the BLAST hit is farther than this distance, it will not be considered adjacent to the neighboring gene
 max_distance: 50000
-
+# also specify the minimum annotation overlapping a BLAST hit to be recorded
+# annotations that overlap less than this percentage of the BLAST hit will be ignored 
+overlap_threshold: 0.1

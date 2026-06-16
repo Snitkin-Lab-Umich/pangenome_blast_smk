@@ -8,17 +8,26 @@
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=5g
-#SBATCH --time=40:00:00
+#SBATCH --time=48:00:00
 
 # reminder: requires blast-plus/2.16.0 module
 
-# clade I pangenome blast validation (spliced)
+# clade IV pangenome blast validation (spliced)
 module load Bioinformatics snakemake blast-plus/2.16.0
-snakemake -s workflow/pangenome_blast.smk -p --configfile config/config_cladeI.yaml --profile ./profile/
+snakemake -s workflow/pangenome_blast.smk -p --configfile config/config_cladeIV.yaml --profile ./profile/
+
+
+# clade III pangenome blast validation (spliced)
+module load Bioinformatics snakemake blast-plus/2.16.0
+snakemake -s workflow/pangenome_blast.smk -p --configfile config/config_cladeIII.yaml --profile ./profile/
+
+# # clade I pangenome blast validation (spliced)
+# module load Bioinformatics snakemake blast-plus/2.16.0
+# snakemake -s workflow/pangenome_blast.smk -p --configfile config/config_cladeI.yaml --profile ./profile/ --rerun-triggers mtime
 
 # clade I pangenome blast validation (unspliced)
-module load Bioinformatics snakemake blast-plus/2.16.0
-snakemake -s workflow/pangenome_blast.smk -p --configfile config/config_cladeI_unspliced.yaml --profile ./profile/
+#module load Bioinformatics snakemake blast-plus/2.16.0
+#snakemake -s workflow/pangenome_blast.smk -p --configfile config/config_cladeI_unspliced.yaml --profile ./profile/
 
 # all clades pangenome blast validation
 # module load Bioinformatics snakemake blast-plus/2.16.0

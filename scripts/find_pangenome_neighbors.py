@@ -80,10 +80,6 @@ def neighbor_search(gene_family, isolate, neighbor_dict, gff_db, pan_matrix):
         genes_seen = [gene_family]
         target_genefam_GeneName = False
         while not target_genefam_GeneName:
-            # print(target_genefam_list)
-            # print(target_genefam)
-            # print(genes_seen)
-            # print(target_genefam_GeneName)
             # if there are no more neighbors to check, or if we have searched more than 20 genes, give up and mark as not_found
             if target_genefam_list == [] or len(genes_seen) > 20:
                 present_neighbor_dict[neighbor] = 'not_found'
@@ -110,53 +106,6 @@ def neighbor_search(gene_family, isolate, neighbor_dict, gff_db, pan_matrix):
             while target_genefam in present_neighbor_dict.keys():
                 target_genefam += '_REP'
             present_neighbor_dict[target_genefam] = target_genefam_GeneName
-        # target_genefam = neighbor
-        # target_genefam_list = []
-        # genes_seen = []
-        # target_genefam_GeneName_string = pan_matrix.loc[pan_matrix['Gene'] == target_genefam, isolate].iloc[0]
-        # target_genefam_GeneName = gene_name_checker_paralogskip(target_genefam_GeneName_string)
-        # while not target_genefam_GeneName:
-        #     genes_seen.append(target_genefam)
-        #     next_neighbors = neighbor_dict.get(target_genefam, [])
-        #     # remove any previously seen genes to avoid infinite loops
-        #     next_neighbors = [x for x in next_neighbors if x not in genes_seen]
-        #     # if there are multiple next neighbors, just take the first one
-        #     # note that dead ends will make the neighbor search terminate early if the second neighbor is the 'correct' path
-        #     # target_genefam = next_neighbors[0]
-        #     # append all next neighbors to the target_genefam_list, trying each one at a time
-        #     target_genefam_list.extend(next_neighbors)
-        #     # if the target_genefam_list is empty, then no present neighbors were found and no further searching can be performed
-        #     # (also stop if more than 20 genes have been searched)
-        #     if target_genefam_list == [] or len(genes_seen) > 20:
-        #         present_neighbor_dict[target_genefam] = 'not_found'
-        #         target_genefam = None
-        #         break
-        #     # otherwise, take the next gene family from the target_genefam_list and use it as target_genefam
-        #     target_genefam_GeneName_string = pan_matrix.loc[pan_matrix['Gene'] == target_genefam, isolate].iloc[0]
-        #     target_genefam_GeneName = gene_name_checker_paralogskip(target_genefam_GeneName_string)
-        # if target_genefam is not None:
-        #     present_neighbor_dict[target_genefam] = target_genefam_GeneName
-    # the neighbor dict should now consist only of neighboring gene families that are actually present in this assembly
-    #print(f'present neighbor list: {present_neighbor_list}')
-    # first, determine if any missing neighbors are due to the pangenome graph not containing neighbors, or due to a failure to find present neighbors in this isolate
-    # if len(neighbor_list) == 0:
-    #     if len(present_neighbor_dict) == 0:
-    #         return [('no_neighbor','absent','absent','absent','absent'),('no_neighbor','absent','absent','absent','absent')]
-    #     else:
-    #         print(f'Error: mismatch between pangenome graph neighbors and located neighbors for gene family {gene_family} in isolate {isolate}.')
-    # elif len(neighbor_list) >= 1 and len(present_neighbor_dict) < 2:
-    # # for each of these neighbors, extract their scaffold, start, and end positions from the gff file
-    # else:
-    #     neighbor_data = []
-    #     #gff_file = f'{gff_dir}/{isolate}.gff'
-    #     #gff_db = gff.create_db(gff_file,dbfn=":memory:",force=True,keep_order=False,merge_strategy="create_unique",sort_attribute_values=True,from_string=False)
-    #     for neighbor_GeneFam,neighbor_GeneName in present_neighbor_dict.items():
-    #         gene_feature = gff_db[neighbor_GeneName]
-    #         scaffold = gene_feature.seqid
-    #         start = gene_feature.start
-    #         end = gene_feature.end
-    #         neighbor_data.append((neighbor_GeneFam, neighbor_GeneName, scaffold, start, end))
-    #print(f'neighbor positions: {neighbor_positions}')
     neighbor_data = resolve_graph_neighbors(neighbor_list, present_neighbor_dict, gff_db, isolate)
     return neighbor_data
 
@@ -190,17 +139,13 @@ def resolve_graph_neighbors(graph_neighbor_list, found_neighbor_dict, gff_db, is
         found_neighbor_data.sort(key=lambda x: x[1] == 'not_found')
         # return the first two neighbors 
         return found_neighbor_data[:2]
-    # while len(graph_neighbor_list) > len(found_neighbor_data):
-    #     # this means some neighbors were in the pangenome graph but could not be found in the isolate
-    #     # indicate this with ('not_found','absent','absent','absent','absent')
-    #     found_neighbor_data.append(('not_found','absent','absent','absent','absent'))
     # if there are still less than two neighbors, it means the pangenome graph had less than two neighbors
     while len(found_neighbor_data) < 2:
         found_neighbor_data.append(('no_neighbor','no_neighbor','absent','absent','absent'))
     return found_neighbor_data[:2]
 
 
-def create_neighbor_table(accessory_gene_list, isolate_list, pan_matrix, pan_graph, gff_dir, output_dir):
+def create_neighbor_table(accessory_gene_list, isolate_list, pan_matrix, pan_graph, gff_dir, output_dir, spliced_gff):
     # for each isolate in the isolate_list, iterate through the full list of accessory gene families
     # for each gene family, identify the position of the gene in this isolate (if present)
     # then, identify the positions of the neighboring gene families as well (if present)
@@ -214,9 +159,10 @@ def create_neighbor_table(accessory_gene_list, isolate_list, pan_matrix, pan_gra
             fhout.write('GeneFamily\tGeneName\tScaffold\tStart\tEnd\tNeighbor1_GeneFamily\tNeighbor1_GeneName\tNeighbor1_Scaffold\tNeighbor1_Start\tNeighbor1_End\tNeighbor2_GeneFamily\tNeighbor2_GeneName\tNeighbor2_Scaffold\tNeighbor2_Start\tNeighbor2_End\tNeighbor_Shared_Scaffold\tPresent_Shared_Scaffold\n')
             # get the gffdb for this isolate
             gff_file = f'{gff_dir}/{isolate}.gff'
+            if not spliced_gff:
+                gff_file = f'{gff_dir}/{isolate}.gff3'
             gff_db = gff.create_db(gff_file,dbfn=":memory:",force=True,keep_order=False,merge_strategy="create_unique",sort_attribute_values=True,from_string=False)
             for genefam in accessory_gene_list:
-                #print(f'starting gene family {genefam} in isolate {isolate}')
                 # determine if this gene family is present in this isolate
                 genefam_GeneName_string = pan_matrix.loc[pan_matrix['Gene'] == genefam, isolate].iloc[0]
                 genefam_GeneName = gene_name_checker(genefam_GeneName_string)
@@ -231,17 +177,10 @@ def create_neighbor_table(accessory_gene_list, isolate_list, pan_matrix, pan_gra
                 # regardless of presence/absence of the target gene, determine the position of the neighbors
                 neighbor_data = neighbor_search(genefam, isolate, neighbor_dict, gff_db, pan_matrix)
                 # neighbor data should now always contain exactly two entries
-                # if len(neighbor_data) == 1:
-                #     neighbor_data.append(('not_found','absent','absent','absent','absent'))
-                # if len(neighbor_data) > 2:
-                #     print(f'Warning: more than two present neighbors found for gene family {genefam} in isolate {isolate}. Only the first two will be used.')
-                #     neighbor_data = neighbor_data[:2]
                 neighbor_shared_scaffold = 'FALSE'
-                #print(neighbor_data)
                 if neighbor_data[0][2] == neighbor_data[1][2] and neighbor_data[0][2] != 'absent':
                     neighbor_shared_scaffold = 'TRUE'
                 present_shared_scaffold = 'FALSE'
-                #print(neighbor_data)
                 if genefam_data[2] == neighbor_data[0][2] and genefam_data[2] == neighbor_data[1][2] and genefam_data[2] != 'absent':
                     present_shared_scaffold = 'TRUE'
                 outdata = genefam_data + neighbor_data[0] + neighbor_data[1] + (neighbor_shared_scaffold,present_shared_scaffold)
@@ -281,7 +220,16 @@ def main():
         help='''Provide a path to a directory for output files.''',
         default=None
         )
+    parser.add_argument(
+        '--spliced_gff','-sg',type=str,choices=['True','False'],
+        help='''Provide a boolean value to indicate whether to use spliced GFF files.''',
+        default='True'
+        )
     args = parser.parse_args()
+    if args.spliced_gff == 'True':
+        args.spliced_gff = True
+    else:
+        args.spliced_gff = False
     # read in the accessory gene list
     accessory_df = pd.read_csv(args.accessory_list)
     accessory_gene_list = accessory_df['gene_family'].tolist()
@@ -289,7 +237,7 @@ def main():
     isolate_df = pd.read_csv(args.isolate_list,header=None)
     isolate_list = isolate_df[0].tolist()
     # create the neighbor table
-    create_neighbor_table(accessory_gene_list, isolate_list, args.pan_matrix, args.pan_graph, args.gff_dir, args.out_dir)
+    create_neighbor_table(accessory_gene_list, isolate_list, args.pan_matrix, args.pan_graph, args.gff_dir, args.out_dir, args.spliced_gff)
 
 if __name__ == '__main__':
     main()

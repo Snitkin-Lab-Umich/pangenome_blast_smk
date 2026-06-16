@@ -180,11 +180,15 @@ def main():
         default=None
         )
     parser.add_argument(
-        '--spliced_gff','-sgff',type=bool,
+        '--spliced_gff','-sgff',type=str,choices=['True','False'],
         help='''Specify if the gff files provided have their introns spliced out. If this is False, mRNA annotations will be used as coordinates instead of CDS annotations to account for introns.''',
-        default=True
+        default='True'
         )
     args = parser.parse_args()
+    if args.spliced_gff == 'True':
+        args.spliced_gff = True
+    else:
+        args.spliced_gff = False
     extract_sequences(args.input, args.assemblies, args.gff, args.pangenome, args.filterfile, args.spliced_gff,args.output)
 
 

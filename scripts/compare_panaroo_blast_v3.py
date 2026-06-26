@@ -15,7 +15,8 @@ def compare_panaroo_blast_v3(panaroo_file, blast_file, filterfile, output_file):
         header_line = 'Gene_Family\tPanaroo_Presence\tPanaroo_Absence'
         header_line += '\tPanP_BlastNoHit\tPanP_BlastHitConcordant\tPanP_BlastHitDiscordant\tPanP_BlastHitMissing\tPanP_BlastOffTarget'
         header_line += '\tPanA_BlastNoHit\tPanA_BlastHitConcordant\tPanA_BlastHitDiscordant\tPanA_BlastHitMissing\tPanA_BlastOffTarget'
-        header_line += '\tAvg_Expected_Neighbors\tAvg_Blast_Neighbors\tOverlap_GeneFamilies\tOverlap_GeneFamilies_NoCoOccurance\tDiscordant_Percent_Overlap\n'
+        header_line += '\tAvg_Expected_Neighbors\tAvg_Blast_Neighbors\tOverlap_GeneFamilies\tOverlap_GeneFamilies_NoCoOccurance\tDiscordant_Percent_Overlap'
+        header_line += '\tPanA_BlastHitDiscordant_PerfectHit\tPanA_BlastHitMissing_PerfectHit\n'
         _ = fh.write(header_line)
         for gene_fam, blastdf_gf in blastdf.groupby('Query_SeqID'):
             d = {}
@@ -34,6 +35,8 @@ def compare_panaroo_blast_v3(panaroo_file, blast_file, filterfile, output_file):
             d['blast_HitDiscordant_isolates'] = set()
             d['blast_HitMissing_isolates'] = set()
             d['blast_OffTarget_isolates'] = set()
+            # separately track the number of isolates with perfect matches
+            d['blast_PerfectMatch_isolates'] = set()
             for index, row in blastdf_gf.iterrows():
                 isolate_name = row['Subject_SeqID']
                 if row['Good_Blast_Hit'] == False:
@@ -48,15 +51,24 @@ def compare_panaroo_blast_v3(panaroo_file, blast_file, filterfile, output_file):
                             d['blast_HitConcordant_isolates'].add(isolate_name)
                         else:
                             d['blast_HitDiscordant_isolates'].add(isolate_name)
+                if row['Perfect_Match'] == True:
+                    d['blast_PerfectMatch_isolates'].add(isolate_name)
             if d['panaroo_presence_isolates'] | d['panaroo_absence_isolates'] != d['blast_NoHit_isolates'] | d['blast_HitConcordant_isolates'] | d['blast_HitDiscordant_isolates'] | d['blast_HitMissing_isolates'] | d['blast_OffTarget_isolates']:
                 print(f'Error: mismatch in isolate sets for gene family {gene_fam}')
                 quit(1)
             out_line = f'{gene_fam}\t{len(d["panaroo_presence_isolates"])}\t{len(d["panaroo_absence_isolates"])}'
             # add the number of NoHit, HitConcordant, etc. isolates that are present in panaroo
+            # while iterating, count the number of perfect matches among the following categories:
+            # panaroo_absence + blast_HitDiscordant
+            # panaroo_absence + blast_HitMissing
             for ikey in ['panaroo_presence_isolates', 'panaroo_absence_isolates']:
                 for jkey in ['blast_NoHit_isolates', 'blast_HitConcordant_isolates', 'blast_HitDiscordant_isolates', 'blast_HitMissing_isolates', 'blast_OffTarget_isolates']:
                     count = len(d[ikey] & d[jkey])
                     out_line += f'\t{count}'
+                    if ikey == 'panaroo_absence_isolates' and jkey == 'blast_HitDiscordant_isolates':
+                        panaroo_absence_blast_HitDiscordant_perfect = len(d[ikey] & d[jkey] & d['blast_PerfectMatch_isolates'])
+                    if ikey == 'panaroo_absence_isolates' and jkey == 'blast_HitMissing_isolates':
+                        panaroo_absence_blast_HitMissing_perfect = len(d[ikey] & d[jkey] & d['blast_PerfectMatch_isolates'])
             # add average expected and found neighbors
             out_line += f'\t{blastdf_gf["Expected_Neighbors"].mean()}\t{blastdf_gf["Max_Neighbors_in_BLAST"].mean()}'
             # add a string of each unique discordant overlap gene family
@@ -70,7 +82,7 @@ def compare_panaroo_blast_v3(panaroo_file, blast_file, filterfile, output_file):
                 # take the mean of the Percent_Overlap column, only counting rows where discordant gene families were found
                 dis_gf_df = blastdf_gf[blastdf_gf['Overlap_GeneFamily'].isin(dis_gf)]
                 dis_gf_overlap = dis_gf_df['Percent_Overlap'].mean()
-            out_line += f'\t{",".join(dis_gf)}\t{",".join(dis_gf_co)}\t{dis_gf_overlap}\n'
+            out_line += f'\t{",".join(dis_gf)}\t{",".join(dis_gf_co)}\t{dis_gf_overlap}\t{panaroo_absence_blast_HitDiscordant_perfect}\t{panaroo_absence_blast_HitMissing_perfect}\n'
             _ = fh.write(out_line)
 
 def check_discordant_gene_families(gene_fam, dis_gf_list, pandf):
@@ -140,7 +152,7 @@ def read_blast_data_v3(blast_file):
     with open(blast_file, 'r') as fhin:
         next(fhin)
         for line in fhin:
-            query_seqid, subject_seqid, expected_neighbors, found_neighbors, good_blast_hit, overlap_found, overlap_name, overlap_gf, overlap_category, overlap_percent = line.strip().split('\t')
+            query_seqid, subject_seqid, expected_neighbors, found_neighbors, good_blast_hit, overlap_found, overlap_name, overlap_gf, overlap_category, overlap_percent, perfect_match = line.strip().split('\t')
             if query_seqid not in blastdict:
                 blastdict[query_seqid] = {'nohit': set(), '2e2n': set(), '2e1n': set(), '2e0n': set(), '1e1n': set(), '1e0n': set(), '0e0n': set()}
             key = ''

@@ -4,7 +4,7 @@ import pandas as pd
 
 def write_output_v2(outdata, output_file):
     with open(output_file, 'w') as out_f:
-        _ = out_f.write('Query_SeqID\tSubject_SeqID\tExpected_Neighbors\tMax_Neighbors_in_BLAST\tGood_Blast_Hit\tOverlap_Found\tOverlap_Name\tOverlap_GeneFamily\tOverlap_Category\tPercent_Overlap\n')
+        _ = out_f.write('Query_SeqID\tSubject_SeqID\tExpected_Neighbors\tMax_Neighbors_in_BLAST\tGood_Blast_Hit\tOverlap_Found\tOverlap_Name\tOverlap_GeneFamily\tOverlap_Category\tPercent_Overlap\tPerfect_Match\n')
         for query_seqid, subject_hit_data_list in outdata.items():
             if subject_hit_data_list == []:
                 print(f'Error: missing data for query {query_seqid}')
@@ -35,7 +35,7 @@ def evaluate_blast_hits_v2(blastdf, neighbor_db_dir, minimum_identity=0.8, minim
     for gf in genes_not_seen:
         subject_hit_data_list = []
         for isolate in isolate_list:
-            subject_hit_data_list.append((isolate, 0, 0, False, False, 'None', 'None', 'None', 0))
+            subject_hit_data_list.append((isolate, 0, 0, False, False, 'None', 'None', 'None', 0, False))
         outdata[gf] = subject_hit_data_list
     return outdata
 
@@ -64,14 +64,14 @@ def find_neighboring_best_hit_v2(query_blastdf, minimum_identity, minimum_evalue
         isolates_not_seen.discard(assembly_name)
     # for any isolates not seen at all in the blast results, add an entry indicating no hits
     for isolate in isolates_not_seen:
-        subject_hit_data.append((isolate, 0, 0, False, False, 'None', 'None', 'None', 0))
+        subject_hit_data.append((isolate, 0, 0, False, False, 'None', 'None', 'None', 0, False))
     return subject_hit_data
 
 
 def gff_neighbor_search_v3(query_gene_fam, assembly_name, blastdf, neighbor_df, max_distance, overlap_threshold):
     # initialize outdata
     # isolate name, neighbors expected, max neighbors of best blast hit, if a good blast hit was found, if a good overlap was found, name of overlapping gene, name of overlapping gene family, category of overlapping gene
-    outdata = (assembly_name, 0, 0, False, False, 'None', 'None', 'None', 0)
+    outdata = (assembly_name, 0, 0, False, False, 'None', 'None', 'None', 0, False)
     # if no blast hits were found, return immediately
     if blastdf.empty:
         return outdata
@@ -98,6 +98,7 @@ def gff_neighbor_search_v3(query_gene_fam, assembly_name, blastdf, neighbor_df, 
     overlap_gene_family = 'None'
     overlap_category = 'None'
     percent_overlap = 0
+    perfect_match = False
     for _, row in blastdf.iterrows():
         # all rows in this table should consist of hits that pass the thresholds above
         # iterate through blast hits, recording the one with the most neighbors present
@@ -126,9 +127,13 @@ def gff_neighbor_search_v3(query_gene_fam, assembly_name, blastdf, neighbor_df, 
                 overlap_gene_family = 'None'
                 overlap_category = 'None'
                 percent_overlap = 0
+            # determine if this is a perfect match - 100% identity and 100% coverage of the query
+            perfect_match = False
+            if row['percent_identity'] == 100 and row['alignment_length'] == row['query_length']:
+                perfect_match = True
         if blast_neighbors == neighbors_expected:
             break
-    outdata = (assembly_name, neighbors_expected, blast_neighbors, True, found_overlap, overlap_gene, overlap_gene_family, overlap_category, percent_overlap)
+    outdata = (assembly_name, neighbors_expected, blast_neighbors, True, found_overlap, overlap_gene, overlap_gene_family, overlap_category, percent_overlap, perfect_match)
     return outdata
 
 

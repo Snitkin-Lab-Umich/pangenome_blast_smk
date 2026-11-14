@@ -152,7 +152,7 @@ def read_blast_data_v3(blast_file):
     with open(blast_file, 'r') as fhin:
         next(fhin)
         for line in fhin:
-            query_seqid, subject_seqid, expected_neighbors, found_neighbors, good_blast_hit, overlap_found, overlap_name, overlap_gf, overlap_category, overlap_percent, perfect_match = line.strip().split('\t')
+            query_seqid, subject_seqid, expected_neighbors, found_neighbors, good_blast_hit, overlap_found, overlap_name, overlap_gf, overlap_category, overlap_percent, perfect_match, long_distance = line.strip().split('\t')
             if query_seqid not in blastdict:
                 blastdict[query_seqid] = {'nohit': set(), '2e2n': set(), '2e1n': set(), '2e0n': set(), '1e1n': set(), '1e0n': set(), '0e0n': set()}
             key = ''

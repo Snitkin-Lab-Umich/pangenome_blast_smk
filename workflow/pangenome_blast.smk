@@ -9,6 +9,7 @@ CLADE = config["clade"]
 
 rule all:
     input:
+        #blast_summary_matrix = expand("results/{PREFIX}/output2/panaroo_blast_summary_matrix_{PREFIX}_{CLADE}.tsv", PREFIX=PREFIX, CLADE=CLADE),
         comparison_table = expand("results/{PREFIX}/output2/panaroo_blast_comparison_{PREFIX}_{CLADE}.tsv", PREFIX=PREFIX, CLADE=CLADE),
         #comparison_output_high = expand("results/{PREFIX}/output2/panaroo_blast_comparison_{PREFIX}_{CLADE}_high_confidence.tsv", PREFIX=PREFIX, CLADE=CLADE),
         #comparison_output_med = expand("results/{PREFIX}/output2/panaroo_blast_comparison_MediumConfidence_{PREFIX}_{CLADE}.tsv", PREFIX=PREFIX, CLADE=CLADE),
@@ -30,7 +31,7 @@ rule extract_accessory_gene_sequences:
         spliced_gff = config.get("spliced_gff", True),
     resources:
         mem_mb = 4000,
-        runtime = 60,
+        runtime = 180,
     threads: 1
     conda:
         'biopython'
@@ -70,8 +71,8 @@ rule caurisblast:
         filterfile = config.get("filterfile", None),
         batch_name = f"{PREFIX}_{CLADE}",
     resources:
-        mem_mb = 6000,
-        runtime = 120,
+        mem_mb = 20000,
+        runtime = 1000,
     conda:
         'biopython'
     threads: 4
@@ -102,9 +103,12 @@ rule add_annotations_to_blast:
         pangenome_names = config["pangenome_matrix"],
         pangenome_numbers = config["pangenome_categories"],
         clade_name = config["clade"],
+        minimum_identity = config.get("minimum_identity", 0.9),
+        maximum_evalue = config.get("maximum_evalue", 1e-5),
+        minimum_coverage = config.get("minimum_coverage", 0.9),
     resources:
-        mem_mb = 30000,
-        runtime = 1200,
+        mem_mb = 8000,
+        runtime = 180,
     threads: 1
     conda:
         'biopython'
@@ -129,8 +133,8 @@ rule find_pangenome_neighbors:
         pan_graph = config["pangenome_graph"],
         gff_dir = config["gff_dir"],
     resources:
-        mem_mb = 40000,
-        runtime = 600,
+        mem_mb = 6000,
+        runtime = 360,
     threads: 1
     conda:
         'biopython'
@@ -156,8 +160,8 @@ rule summarize_neighbor_db:
     params:
         neighbor_db = "results/{PREFIX}/neighbor_db/{CLADE}/",
     resources:
-        mem_mb = 15000,
-        runtime = 600,
+        mem_mb = 1000,
+        runtime = 60,
     threads: 1
     conda:
         'biopython'
@@ -178,29 +182,49 @@ rule summarize_blast_results:
         filterfile = config.get("filterfile", None),
         neighbor_db = "results/{PREFIX}/neighbor_db/{CLADE}/",
         minimum_identity = config.get("minimum_identity", 0.9),
-        minimum_evalue = config.get("minimum_evalue", 1e-5),
+        maximum_evalue = config.get("maximum_evalue", 1e-5),
         minimum_coverage = config.get("minimum_coverage", 0.9),
         max_distance = config.get("max_distance", 50000),
         overlap_threshold = config.get("overlap_threshold", 0.1),
         accessory_gene_list = config["accessory_gene_list"],
     resources:
-        mem_mb = 15000,
-        runtime = 600,
+        mem_mb = 8000,
+        runtime = 1800,
     threads: 1
     conda:
         'biopython'
     shell:
         """
-        python3.12 scripts/read_blast_neighbors_v3.py --input {input.blast_annotated_output} --output {output.blast_summary_output} \
-        --neighbor_db {params.neighbor_db} --minimum_identity {params.minimum_identity} --minimum_evalue {params.minimum_evalue} \
+        python3.12 scripts/read_blast_neighbors_v4.py --input {input.blast_annotated_output} --output {output.blast_summary_output} \
+        --neighbor_db {params.neighbor_db} --minimum_identity {params.minimum_identity} --maximum_evalue {params.maximum_evalue} \
         --minimum_coverage {params.minimum_coverage} --maximum_distance {params.max_distance} --pangenome {params.matrix} --filterfile {params.filterfile} \
         --overlap_threshold {params.overlap_threshold} --gene_list {params.accessory_gene_list}
+        """
+
+
+rule output_matrix:
+    input:
+        blast_summary_output = "results/{PREFIX}/output1/blast_summary_output_{PREFIX}_{CLADE}.tsv",
+    output:
+        blast_summary_matrix = "results/{PREFIX}/output2/panaroo_blast_summary_matrix_{PREFIX}_{CLADE}.tsv",
+    params:
+        matrix = config["pangenome_matrix"],
+        filterfile = config.get("filterfile", None),
+    resources:
+        mem_mb = 4000,
+        runtime = 360,
+    threads: 1
+    shell:
+        """
+        python3.13 scripts/make_blast_summary_matrix.py --blast {input.blast_summary_output} --panaroo {params.matrix} \
+        --output {output.blast_summary_matrix} --filterfile {params.filterfile}
         """
 
 
 rule compare_panaroo_blast:
     input:
         blast_summary_output = "results/{PREFIX}/output1/blast_summary_output_{PREFIX}_{CLADE}.tsv",
+        blast_summary_matrix = "results/{PREFIX}/output2/panaroo_blast_summary_matrix_{PREFIX}_{CLADE}.tsv",
     output:
         #comparison_output_high = "results/{PREFIX}/output2/panaroo_blast_comparison_{PREFIX}_{CLADE}_high_confidence.tsv",
         #comparison_output_medium = "results/{PREFIX}/output2/panaroo_blast_comparison_{PREFIX}_{CLADE}_medium_confidence.tsv",
@@ -215,7 +239,7 @@ rule compare_panaroo_blast:
         #output_filename = "results/{PREFIX}/output2/panaroo_blast_comparison_{PREFIX}_{CLADE}.tsv",
     resources:
         mem_mb = 8000,
-        runtime = 600,
+        runtime = 1800,
     threads: 1
     conda:
         'biopython'

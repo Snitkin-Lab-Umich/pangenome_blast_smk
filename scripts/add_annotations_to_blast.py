@@ -4,6 +4,11 @@ import pandas as pd
 import gffutils as gff
 import os
 
+# changes to make:
+# skip any blast hits that are below the qc thresholds
+# use groupby instead of iterrows
+
+
 def read_blast(file_path):
     # parse the BLAST output by skipping the first five lines, treating the rest as tab-separated values
     blastdf = pd.read_csv(file_path, sep='\t', comment='#', header=None)
@@ -121,7 +126,12 @@ def add_annotations(blast_file, gff_dir, pangenome_name_matrix, pangenome_num_ma
     blastdf['annotation_name'] = 'None'
     blastdf['annotation_gf'] = 'None'
     blastdf['annotation_type'] = 'None'
-    for assembly_name in blastdf['assembly_name'].unique():
+
+
+    annotation_cols = ['overlaps_annotation','annotation_coverage','annotation_name','annotation_gf','annotation_type',]
+    hit_cols = ['subject_scaffold','subject_start','subject_end',]
+
+    for assembly_name, hits in blastdf.groupby('assembly_name', sort=False):
         gff_file_path = os.path.join(gff_dir, f'{assembly_name}.gff')
         if not os.path.isfile(gff_file_path):
             gff_file_path = os.path.join(gff_dir, f'{assembly_name}.gff3')
@@ -129,18 +139,53 @@ def add_annotations(blast_file, gff_dir, pangenome_name_matrix, pangenome_num_ma
             print(f'Unable to locate gff file for assembly {assembly_name} at {gff_file_path}')
             continue
         gffdb = gff.create_db(gff_file_path, dbfn=':memory:', force=True, keep_order=True, merge_strategy='merge', sort_attribute_values=True)
-        for index, row in blastdf[blastdf['assembly_name'] == assembly_name].iterrows():
-            subject_scaffold = row['subject_scaffold']
-            subject_blast_start = int(row['subject_start'])
-            subject_blast_end = int(row['subject_end'])
-            subject_start = min(subject_blast_start,subject_blast_end)
-            subject_end = max(subject_blast_start,subject_blast_end)
-            overlap_data = get_overlapping_annotations(gffdb, cds_to_gf_dict, gf_to_category_dict, assembly_name, subject_scaffold, subject_start, subject_end)
-            blastdf.at[index, 'overlaps_annotation'] = overlap_data[0]
-            blastdf.at[index, 'annotation_coverage'] = overlap_data[1]
-            blastdf.at[index, 'annotation_name'] = overlap_data[2]
-            blastdf.at[index, 'annotation_gf'] = overlap_data[3]
-            blastdf.at[index, 'annotation_type'] = overlap_data[4]
+
+        results = []
+        # Cache within this assembly only. Identical intervals have the same result.
+        overlap_cache = {}
+
+        for scaffold, start, end in hits[hit_cols].itertuples(index=False, name=None):
+            start, end = sorted((int(start), int(end)))
+            key = (scaffold, start, end)
+
+            if key not in overlap_cache:
+                overlap_cache[key] = get_overlapping_annotations(
+                    gffdb,
+                    cds_to_gf_dict,
+                    gf_to_category_dict,
+                    assembly_name,
+                    scaffold,
+                    start,
+                    end,
+                )
+
+            results.append(overlap_cache[key])
+
+        # Assign once per column per assembly, rather than once per cell.
+        for column, values in zip(annotation_cols, zip(*results)):
+            blastdf.loc[hits.index, column] = list(values)
+
+
+        # for assembly_name in blastdf['assembly_name'].unique():
+        #     gff_file_path = os.path.join(gff_dir, f'{assembly_name}.gff')
+        #     if not os.path.isfile(gff_file_path):
+        #         gff_file_path = os.path.join(gff_dir, f'{assembly_name}.gff3')
+        #     if not os.path.isfile(gff_file_path):
+        #         print(f'Unable to locate gff file for assembly {assembly_name} at {gff_file_path}')
+        #         continue
+        #     gffdb = gff.create_db(gff_file_path, dbfn=':memory:', force=True, keep_order=True, merge_strategy='merge', sort_attribute_values=True)
+        # for index, row in blastdf[blastdf['assembly_name'] == assembly_name].iterrows():
+        #     subject_scaffold = row['subject_scaffold']
+        #     subject_blast_start = int(row['subject_start'])
+        #     subject_blast_end = int(row['subject_end'])
+        #     subject_start = min(subject_blast_start,subject_blast_end)
+        #     subject_end = max(subject_blast_start,subject_blast_end)
+        #     overlap_data = get_overlapping_annotations(gffdb, cds_to_gf_dict, gf_to_category_dict, assembly_name, subject_scaffold, subject_start, subject_end)
+        #     blastdf.at[index, 'overlaps_annotation'] = overlap_data[0]
+        #     blastdf.at[index, 'annotation_coverage'] = overlap_data[1]
+        #     blastdf.at[index, 'annotation_name'] = overlap_data[2]
+        #     blastdf.at[index, 'annotation_gf'] = overlap_data[3]
+        #     blastdf.at[index, 'annotation_type'] = overlap_data[4]
     blastdf.to_csv(output_file, sep='\t', index=False)
 
 
